@@ -56,13 +56,13 @@ class ArpSpoofer(object):
         # Write you code here:
         if self.target_mac is not None:
             return self.target_mac
-        arp_request = Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=self.target_ip)
-        response = scapy.srp(arp_request, iface=IFACE, timeout=5, verbose=False)[0]
-        if response:
-            self.target_mac = response[0][1].hwsrc
+        arp_request = Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(op=1, pdst=self.target_ip)
+        response = scapy.srp1(arp_request, iface=IFACE, timeout=2, verbose=False)
+        if response is not None:
+            self.target_mac = response[ARP].hwsrc
             return self.target_mac
         else:
-            raise Exception(f"Could not get MAC address for {self.target_ip}")
+            raise Exception(f"Could not get target mac for ip {self.target_ip}")
 
     def spoof(self) -> None:
         """
